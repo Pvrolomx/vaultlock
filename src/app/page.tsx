@@ -88,7 +88,7 @@ async function decrypt(encrypted: Uint8Array, key: CryptoKey, iv: Uint8Array): P
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
     key,
-    encrypted
+    encrypted.buffer as ArrayBuffer
   );
   return new TextDecoder().decode(decrypted);
 }
