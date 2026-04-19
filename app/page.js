@@ -433,16 +433,21 @@ function EntryModal({ entry, onSave, onClose, onDelete }) {
           </div>
 
           <button
-            onClick={() => onSave(form)}
-            disabled={!form.name.trim()}
+            onClick={() => {
+              const finalForm = { ...form, name: form.name.trim() || form.username.trim() || form.url.trim() || 'Sin nombre' }
+              onSave(finalForm)
+            }}
+            disabled={!form.name.trim() && !form.username.trim() && !form.password.trim()}
             style={{
-              background: form.name.trim() ? 'var(--accent)' : 'var(--bg4)',
-              color: form.name.trim() ? '#000' : 'var(--text3)', border: 'none', borderRadius: 10,
-              padding: '14px', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 14,
-              cursor: form.name.trim() ? 'pointer' : 'default', marginTop: 8, transition: 'all 0.2s',
-              opacity: form.name.trim() ? 1 : 0.5,
+              background: (form.name.trim() || form.username.trim() || form.password.trim()) ? 'var(--accent)' : 'var(--bg4)',
+              color: (form.name.trim() || form.username.trim() || form.password.trim()) ? '#000' : 'var(--text3)',
+              border: 'none', borderRadius: 10, padding: '14px',
+              fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 14,
+              cursor: (form.name.trim() || form.username.trim() || form.password.trim()) ? 'pointer' : 'default',
+              marginTop: 8, transition: 'all 0.2s',
+              opacity: (form.name.trim() || form.username.trim() || form.password.trim()) ? 1 : 0.4,
             }}>
-            {isNew ? 'Guardar entrada' : 'Actualizar'} {form.name.trim() ? '→' : ''}
+            {isNew ? 'Guardar entrada →' : 'Actualizar →'}
           </button>
         </div>
       </div>
