@@ -309,8 +309,12 @@ function EntryModal({ entry, onSave, onClose, onDelete }) {
           {/* Name */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Nombre *</label>
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Netflix, BBVA, Gmail..."
-              autoFocus style={{
+            <input
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+              onInput={e => set('name', e.target.value)}
+              placeholder="Netflix, BBVA, Gmail..."
+              style={{
                 background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8,
                 padding: '12px 16px', color: 'var(--text)', fontFamily: 'var(--mono)', fontSize: 14, outline: 'none',
               }}
@@ -428,13 +432,17 @@ function EntryModal({ entry, onSave, onClose, onDelete }) {
               onBlur={e => e.target.style.borderColor = 'var(--border)'} />
           </div>
 
-          <button onClick={() => form.name && onSave(form)} style={{
-            background: form.name ? 'var(--accent)' : 'var(--bg4)',
-            color: form.name ? '#000' : 'var(--text3)', border: 'none', borderRadius: 10,
-            padding: '14px', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 14,
-            cursor: form.name ? 'pointer' : 'default', marginTop: 8, transition: 'all 0.2s',
-          }}>
-            {isNew ? 'Guardar entrada' : 'Actualizar'} {form.name ? '→' : ''}
+          <button
+            onClick={() => onSave(form)}
+            disabled={!form.name.trim()}
+            style={{
+              background: form.name.trim() ? 'var(--accent)' : 'var(--bg4)',
+              color: form.name.trim() ? '#000' : 'var(--text3)', border: 'none', borderRadius: 10,
+              padding: '14px', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 14,
+              cursor: form.name.trim() ? 'pointer' : 'default', marginTop: 8, transition: 'all 0.2s',
+              opacity: form.name.trim() ? 1 : 0.5,
+            }}>
+            {isNew ? 'Guardar entrada' : 'Actualizar'} {form.name.trim() ? '→' : ''}
           </button>
         </div>
       </div>
