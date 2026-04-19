@@ -460,6 +460,18 @@ function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync, onImp
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [copiedId, setCopiedId] = useState(null)
+  const [installable, setInstallable] = useState(false)
+
+  useEffect(() => {
+    const onInstallable = () => setInstallable(true)
+    const onInstalled = () => setInstallable(false)
+    window.addEventListener('pwa-installable', onInstallable)
+    window.addEventListener('pwa-installed', onInstalled)
+    return () => {
+      window.removeEventListener('pwa-installable', onInstallable)
+      window.removeEventListener('pwa-installed', onInstalled)
+    }
+  }, [])
 
   function copy(val, id) {
     navigator.clipboard.writeText(val)
@@ -494,6 +506,13 @@ function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync, onImp
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              {installable && (
+                <button onClick={() => window.installPWA()} title="Instalar App" style={{
+                  background: 'rgba(212,255,0,0.15)', border: '1px solid rgba(212,255,0,0.4)',
+                  borderRadius: 8, padding: '7px 10px', cursor: 'pointer',
+                  color: 'var(--accent)', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 11,
+                }}>⬇ instalar</button>
+              )}
               {entries.length < 10 && (
                 <button onClick={onImport} disabled={importing} title="Importar PASSWORDS 6" style={{
                   background: importing ? 'var(--bg3)' : 'rgba(212,255,0,0.1)',
