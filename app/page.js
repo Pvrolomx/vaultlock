@@ -443,7 +443,7 @@ function EntryModal({ entry, onSave, onClose, onDelete }) {
 }
 
 // ─── Main Vault Screen ──────────────────────────────────────────────────────
-function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync }) {
+function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync, onImport, importing }) {
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [copiedId, setCopiedId] = useState(null)
@@ -481,6 +481,16 @@ function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync }) {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              {entries.length < 10 && (
+                <button onClick={onImport} disabled={importing} title="Importar PASSWORDS 6" style={{
+                  background: importing ? 'var(--bg3)' : 'rgba(212,255,0,0.1)',
+                  border: '1px solid rgba(212,255,0,0.3)', borderRadius: 8,
+                  padding: '7px 10px', cursor: importing ? 'default' : 'pointer',
+                  color: 'var(--accent)', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 11,
+                }}>
+                  {importing ? '⟳' : '📥'}
+                </button>
+              )}
               <button onClick={onSync} title="Sincronizar" style={{
                 background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8,
                 padding: '7px 12px', cursor: 'pointer', fontSize: 16,
@@ -761,6 +771,28 @@ export default function VaultLock() {
     }
   }
 
+  // ── Import PASSWORDS 6 ─────────────────────────────────────────────────────
+  const [importing, setImporting] = useState(false)
+  async function handleImport() {
+    if (!cryptoKey || importing) return
+    setImporting(true)
+    showToast('⟳ Importando...')
+    try {
+      const IMPORT_DATA = await fetch('/api/import-data').then(r => r.json()).catch(() => null)
+      if (!IMPORT_DATA) throw new Error('No se pudo cargar datos')
+      const existingNames = new Set(entries.map(e => e.name.toLowerCase()))
+      const toAdd = IMPORT_DATA
+        .filter(e => !existingNames.has(e.name.toLowerCase()))
+        .map(e => ({ ...e, id: crypto.randomUUID(), createdAt: Date.now() }))
+      const merged = [...entries, ...toAdd]
+      await saveEntries(merged)
+      showToast(`✅ ${toAdd.length} entradas importadas`)
+    } catch(e) {
+      showToast('⚠ Error: ' + e.message)
+    }
+    setImporting(false)
+  }
+
   // ── Reset ──────────────────────────────────────────────────────────────────
   function handleReset() {
     if (!window.confirm('⚠️ Esto destruirá tu bóveda local. ¿Estás seguro?')) return
@@ -793,6 +825,8 @@ export default function VaultLock() {
           onLock={() => { setCryptoKey(null); setState('locked') }}
           syncStatus={syncStatus}
           onSync={handleManualSync}
+          onImport={handleImport}
+          importing={importing}
         />
       )}
       {modal && (
