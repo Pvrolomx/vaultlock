@@ -161,7 +161,7 @@ function SetupScreen({ onSetup }) {
 }
 
 // ─── Unlock Screen ──────────────────────────────────────────────────────────
-function UnlockScreen({ onUnlock, onReset }) {
+function UnlockScreen({ onUnlock, onReset, onNewVault }) {
   const [pwd, setPwd] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -173,7 +173,7 @@ function UnlockScreen({ onUnlock, onReset }) {
     try {
       await onUnlock(pwd)
     } catch (e) {
-      setError('Master password incorrecta')
+      setError(e.message === 'Wrong password' ? 'Master password incorrecta' : e.message)
       setLoading(false)
     }
   }
@@ -202,10 +202,18 @@ function UnlockScreen({ onUnlock, onReset }) {
             {loading ? 'Abriendo...' : 'Abrir →'}
           </button>
 
+          <button onClick={onNewVault} style={{
+            background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+            color: 'var(--text2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
+            padding: '10px', marginTop: 4,
+          }}>
+            + Crear bóveda nueva
+          </button>
+
           <button onClick={onReset} style={{
             background: 'none', border: 'none', color: 'var(--text3)',
             fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-            textDecoration: 'underline', marginTop: 8,
+            textDecoration: 'underline', marginTop: 4,
           }}>
             ¿Olvidaste tu contraseña? (destruir bóveda)
           </button>
@@ -605,7 +613,7 @@ export default function VaultLock() {
 
   useEffect(() => {
     const stored = localStorage.getItem('vl2_meta')
-    setState(stored ? 'locked' : 'setup')
+    setState('locked')
   }, [])
 
   useEffect(() => {
@@ -648,12 +656,31 @@ export default function VaultLock() {
 
   // ── Unlock ─────────────────────────────────────────────────────────────────
   async function handleUnlock(masterPwd) {
-    const meta = JSON.parse(localStorage.getItem('vl2_meta') || '{}')
     const pwdHash = await hashPassword(masterPwd)
+    const vid = await hashPassword(masterPwd + '_vault_id')
+    let meta = JSON.parse(localStorage.getItem('vl2_meta') || '{}')
+
+    // New device: no local meta — try to bootstrap from Supabase
+    if (!meta.salt) {
+      let cloud = null
+      try { cloud = await loadVaultFromCloud(vid) } catch {}
+      if (!cloud) throw new Error('No se encontró bóveda. Crea una nueva o sincroniza desde otro dispositivo.')
+      // Verify password by trying to decrypt
+      const testKey = await deriveKey(masterPwd, cloud.salt)
+      try {
+        await decrypt(cloud.blob, testKey)
+      } catch {
+        throw new Error('Wrong password')
+      }
+      // Bootstrap local meta
+      meta = { salt: cloud.salt, pwdHash }
+      localStorage.setItem('vl2_meta', JSON.stringify(meta))
+      localStorage.setItem('vl2_blob', cloud.blob)
+    }
+
     if (pwdHash !== meta.pwdHash) throw new Error('Wrong password')
 
     const key = await deriveKey(masterPwd, meta.salt)
-    const vid = await hashPassword(masterPwd + '_vault_id')
 
     // Try to load from cloud first (latest sync wins)
     let blob = null
@@ -663,10 +690,9 @@ export default function VaultLock() {
       if (cloud) {
         blob = cloud.blob
         cloudSalt = cloud.salt
-        // Update local cache
         localStorage.setItem('vl2_blob', blob)
       }
-    } catch { /* offline or error, use local */ }
+    } catch { /* offline, use local */ }
 
     if (!blob) blob = localStorage.getItem('vl2_blob')
     if (!blob) throw new Error('No vault found')
@@ -758,7 +784,7 @@ export default function VaultLock() {
   return (
     <>
       {state === 'setup' && <SetupScreen onSetup={handleSetup} />}
-      {state === 'locked' && <UnlockScreen onUnlock={handleUnlock} onReset={handleReset} />}
+      {state === 'locked' && <UnlockScreen onUnlock={handleUnlock} onReset={handleReset} onNewVault={() => setState('setup')} />}
       {state === 'unlocked' && (
         <VaultScreen
           entries={entries}
