@@ -7,6 +7,7 @@ const CATEGORIES = [
   { id: 'bank', label: 'Bancos', icon: '🏦' },
   { id: 'email', label: 'Email', icon: '📧' },
   { id: 'social', label: 'Redes', icon: '📱' },
+  { id: 'ai', label: 'IA / Tokens', icon: '🤖' },
   { id: 'work', label: 'Trabajo', icon: '💼' },
   { id: 'gov', label: 'Gobierno', icon: '🏛️' },
   { id: 'crypto', label: 'Crypto', icon: '₿' },
