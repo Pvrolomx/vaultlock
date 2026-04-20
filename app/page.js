@@ -461,17 +461,17 @@ function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync, onImp
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [copiedId, setCopiedId] = useState(null)
-  const [installable, setInstallable] = useState(false)
+  const [installed, setInstalled] = useState(false)
 
   useEffect(() => {
-    const onInstallable = () => setInstallable(true)
-    const onInstalled = () => setInstallable(false)
-    window.addEventListener('pwa-installable', onInstallable)
-    window.addEventListener('pwa-installed', onInstalled)
-    return () => {
-      window.removeEventListener('pwa-installable', onInstallable)
-      window.removeEventListener('pwa-installed', onInstalled)
+    // Hide button if already installed as PWA
+    if (typeof window !== 'undefined') {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+      setInstalled(isStandalone)
     }
+    const onInstalled = () => setInstalled(true)
+    window.addEventListener('pwa-installed', onInstalled)
+    return () => window.removeEventListener('pwa-installed', onInstalled)
   }, [])
 
   function copy(val, id) {
@@ -507,7 +507,7 @@ function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync, onImp
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {installable && (
+              {!installed && (
                 <button onClick={() => window.installPWA()} title="Instalar App" style={{
                   background: 'rgba(212,255,0,0.15)', border: '1px solid rgba(212,255,0,0.4)',
                   borderRadius: 8, padding: '7px 10px', cursor: 'pointer',
