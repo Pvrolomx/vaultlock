@@ -514,8 +514,8 @@ function VaultScreen({ entries, onAdd, onEdit, onLock, syncStatus, onSync, onImp
                   color: 'var(--accent)', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 11,
                 }}>⬇ instalar</button>
               )}
-              {entries.length < 10 && (
-                <button onClick={onImport} disabled={importing} title="Importar PASSWORDS 6" style={{
+              {true && (
+                <button onClick={onImport} disabled={importing} title="Importar / Actualizar entradas" style={{
                   background: importing ? 'var(--bg3)' : 'rgba(212,255,0,0.1)',
                   border: '1px solid rgba(212,255,0,0.3)', borderRadius: 8,
                   padding: '7px 10px', cursor: importing ? 'default' : 'pointer',
