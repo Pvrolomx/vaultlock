@@ -10,6 +10,7 @@ const CATEGORIES = [
   { id: 'ai', label: 'IA / Tokens', icon: '🤖' },
   { id: 'work', label: 'Trabajo', icon: '💼' },
   { id: 'gov', label: 'Gobierno', icon: '🏛️' },
+  { id: 'inm', label: 'INM', icon: '🛂' },
   { id: 'crypto', label: 'Crypto', icon: '₿' },
   { id: 'home', label: 'Casa', icon: '🏠' },
   { id: 'shopping', label: 'Compras', icon: '🛒' },
