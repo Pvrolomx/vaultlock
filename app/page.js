@@ -163,59 +163,244 @@ function SetupScreen({ onSetup }) {
 }
 
 // ─── Unlock Screen ──────────────────────────────────────────────────────────
+// TAP PATTERN: 1-4-3-4 (taps, pause 800ms between groups)
+const TAP_PATTERN = [1, 4, 3, 4]
+const TAP_TIMEOUT = 900  // ms between groups
+const TAP_RESET   = 4000 // ms to reset if incomplete
+
 function UnlockScreen({ onUnlock, onReset, onNewVault }) {
   const [pwd, setPwd] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState('tap') // 'tap' | 'password'
+  const [tapState, setTapState] = useState({ groupIndex: 0, tapsInGroup: 0, dots: [] })
+  const [tapHint, setTapHint] = useState('')
+  const tapTimer = useRef(null)
+  const resetTimer = useRef(null)
+
+  // ── Tap pattern logic ────────────────────────────────────────────────────
+  function handleLockTap() {
+    if (mode !== 'tap' || loading) return
+
+    clearTimeout(resetTimer.current)
+    resetTimer.current = setTimeout(resetTap, TAP_RESET)
+
+    setTapState(prev => {
+      const expected = TAP_PATTERN[prev.groupIndex]
+      const newTaps = prev.tapsInGroup + 1
+      const newDots = [...prev.dots, { g: prev.groupIndex, t: newTaps }]
+
+      if (newTaps < expected) {
+        // Still tapping in this group
+        clearTimeout(tapTimer.current)
+        tapTimer.current = setTimeout(() => advanceGroup(prev.groupIndex, newTaps, newDots), TAP_TIMEOUT)
+        return { ...prev, tapsInGroup: newTaps, dots: newDots }
+      } else {
+        // Completed this group — wait for pause then advance
+        clearTimeout(tapTimer.current)
+        tapTimer.current = setTimeout(() => advanceGroup(prev.groupIndex, newTaps, newDots), TAP_TIMEOUT)
+        return { groupIndex: prev.groupIndex, tapsInGroup: newTaps, dots: newDots }
+      }
+    })
+  }
+
+  function advanceGroup(groupIndex, tapsInGroup, dots) {
+    const expected = TAP_PATTERN[groupIndex]
+    if (tapsInGroup !== expected) {
+      // Wrong count — reset
+      setTapHint('✗')
+      setTimeout(resetTap, 400)
+      return
+    }
+    const nextGroup = groupIndex + 1
+    if (nextGroup >= TAP_PATTERN.length) {
+      // Pattern complete — trigger unlock
+      setTapHint('✓')
+      clearTimeout(resetTimer.current)
+      setTapState({ groupIndex: 0, tapsInGroup: 0, dots: [] })
+      handlePatternSuccess()
+    } else {
+      setTapState({ groupIndex: nextGroup, tapsInGroup: 0, dots })
+    }
+  }
+
+  function resetTap() {
+    clearTimeout(tapTimer.current)
+    clearTimeout(resetTimer.current)
+    setTapState({ groupIndex: 0, tapsInGroup: 0, dots: [] })
+    setTapHint('')
+  }
+
+  async function handlePatternSuccess() {
+    // Pattern is just a quick-unlock — needs stored pwd hash
+    // We use the cached master pwd stored in sessionStorage (set on first unlock)
+    const cached = sessionStorage.getItem('vl2_qpwd')
+    if (!cached) {
+      setTapHint('')
+      setError('Primero desbloquea con master password para activar el patrón táctil')
+      setMode('password')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await onUnlock(cached)
+    } catch (e) {
+      setLoading(false)
+      setTapHint('')
+      setError('Patrón correcto pero sesión expirada — usa master password')
+      setMode('password')
+    }
+  }
 
   async function handleUnlock() {
     if (!pwd) return setError('Ingresa tu master password')
     setLoading(true)
     setError('')
     try {
+      // Cache pwd in sessionStorage for tap pattern (cleared when tab closes)
+      sessionStorage.setItem('vl2_qpwd', pwd)
       await onUnlock(pwd)
     } catch (e) {
+      sessionStorage.removeItem('vl2_qpwd')
       setError(e.message === 'Wrong password' ? 'Master password incorrecta' : e.message)
       setLoading(false)
     }
   }
 
+  // Visual: dots grouped by pattern
+  const dotDisplay = []
+  TAP_PATTERN.forEach((count, gi) => {
+    const filled = tapState.dots.filter(d => d.g === gi).length
+    for (let i = 0; i < count; i++) {
+      dotDisplay.push({ filled: i < filled, active: gi === tapState.groupIndex })
+    }
+    if (gi < TAP_PATTERN.length - 1) dotDisplay.push({ spacer: true })
+  })
+
+  const hasQuickUnlock = typeof window !== 'undefined' && !!sessionStorage.getItem('vl2_qpwd')
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 360, animation: 'slideUp 0.4s cubic-bezier(0.16,1,0.3,1) forwards' }}>
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-          <h1 style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 26, marginBottom: 8 }}>VaultLock</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Ingresa tu master password</p>
-        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Input type="password" value={pwd} onChange={setPwd} autoFocus placeholder="••••••••••••"
-            onKeyDown={e => e.key === 'Enter' && handleUnlock()} />
+        {mode === 'tap' ? (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: 32 }}>
+              {/* Tappable lock icon */}
+              <div
+                onClick={handleLockTap}
+                style={{
+                  fontSize: 72, marginBottom: 20, cursor: 'pointer',
+                  userSelect: 'none', WebkitUserSelect: 'none',
+                  display: 'inline-block', padding: 16,
+                  borderRadius: '50%',
+                  background: tapHint === '✓' ? 'rgba(68,255,136,0.15)' :
+                              tapHint === '✗' ? 'rgba(255,68,68,0.15)' :
+                              tapState.tapsInGroup > 0 ? 'rgba(212,255,0,0.1)' : 'transparent',
+                  border: `2px solid ${
+                    tapHint === '✓' ? 'rgba(68,255,136,0.4)' :
+                    tapHint === '✗' ? 'rgba(255,68,68,0.4)' :
+                    tapState.tapsInGroup > 0 ? 'rgba(212,255,0,0.3)' : 'transparent'
+                  }`,
+                  transition: 'all 0.15s',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {tapHint === '✓' ? '🔓' : tapHint === '✗' ? '🔒' : '🔒'}
+              </div>
 
-          {error && <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', textAlign: 'center' }}>{error}</div>}
+              <h1 style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 26, marginBottom: 8 }}>VaultLock</h1>
 
-          <button onClick={handleUnlock} disabled={loading} style={{
-            background: loading ? 'var(--bg4)' : 'var(--accent)', color: '#000',
-            border: 'none', borderRadius: 10, padding: '14px', width: '100%',
-            fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}>
-            {loading ? 'Abriendo...' : 'Abrir →'}
-          </button>
+              {hasQuickUnlock ? (
+                <p style={{ color: 'var(--text2)', fontSize: 13 }}>Toca el candado con tu patrón</p>
+              ) : (
+                <p style={{ color: 'var(--text3)', fontSize: 12, lineHeight: 1.6 }}>
+                  Patrón táctil no configurado aún<br/>
+                  <span style={{ color: 'var(--text2)' }}>Desbloquea con master password primero</span>
+                </p>
+              )}
+            </div>
 
+            {/* Dot display */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 28, minHeight: 20 }}>
+              {dotDisplay.map((d, i) => d.spacer ? (
+                <div key={i} style={{ width: 12 }} />
+              ) : (
+                <div key={i} style={{
+                  width: d.filled ? 12 : 8, height: d.filled ? 12 : 8,
+                  borderRadius: '50%',
+                  background: d.filled ? 'var(--accent)' : 'var(--bg4)',
+                  border: d.active && !d.filled ? '1px solid var(--text3)' : 'none',
+                  transition: 'all 0.15s',
+                  boxShadow: d.filled ? '0 0 8px rgba(212,255,0,0.5)' : 'none',
+                }} />
+              ))}
+            </div>
+
+            {tapHint === '✗' && (
+              <div style={{ textAlign: 'center', color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: 13, marginBottom: 16 }}>
+                Patrón incorrecto
+              </div>
+            )}
+
+            {error && <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', textAlign: 'center', marginBottom: 12 }}>{error}</div>}
+
+            <button onClick={() => { setError(''); setMode('password') }} style={{
+              background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+              color: 'var(--text2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
+              padding: '10px', width: '100%', marginBottom: 8,
+            }}>
+              Usar master password
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <div onClick={() => setMode('tap')} style={{ fontSize: 48, marginBottom: 16, cursor: 'pointer' }}>🔒</div>
+              <h1 style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 26, marginBottom: 8 }}>VaultLock</h1>
+              <p style={{ color: 'var(--text2)', fontSize: 13 }}>Ingresa tu master password</p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Input type="password" value={pwd} onChange={setPwd} autoFocus placeholder="••••••••••••"
+                onKeyDown={e => e.key === 'Enter' && handleUnlock()} />
+
+              {error && <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', textAlign: 'center' }}>{error}</div>}
+
+              <button onClick={handleUnlock} disabled={loading} style={{
+                background: loading ? 'var(--bg4)' : 'var(--accent)', color: '#000',
+                border: 'none', borderRadius: 10, padding: '14px', width: '100%',
+                fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}>
+                {loading ? 'Abriendo...' : 'Abrir →'}
+              </button>
+
+              {hasQuickUnlock && (
+                <button onClick={() => { setError(''); setMode('tap') }} style={{
+                  background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+                  color: 'var(--text2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
+                  padding: '10px',
+                }}>
+                  ← Usar patrón táctil
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
           <button onClick={onNewVault} style={{
             background: 'none', border: '1px solid var(--border)', borderRadius: 8,
-            color: 'var(--text2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
-            padding: '10px', marginTop: 4,
+            color: 'var(--text2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer', padding: '10px',
           }}>
             + Crear bóveda nueva
           </button>
-
           <button onClick={onReset} style={{
             background: 'none', border: 'none', color: 'var(--text3)',
             fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-            textDecoration: 'underline', marginTop: 4,
+            textDecoration: 'underline',
           }}>
             ¿Olvidaste tu contraseña? (destruir bóveda)
           </button>
