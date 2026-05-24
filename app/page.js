@@ -268,16 +268,6 @@ function UnlockScreen({ onUnlock, onReset, onNewVault }) {
     }
   }
 
-  // Visual: dots grouped by pattern
-  const dotDisplay = []
-  TAP_PATTERN.forEach((count, gi) => {
-    const filled = tapState.dots.filter(d => d.g === gi).length
-    for (let i = 0; i < count; i++) {
-      dotDisplay.push({ filled: i < filled, active: gi === tapState.groupIndex })
-    }
-    if (gi < TAP_PATTERN.length - 1) dotDisplay.push({ spacer: true })
-  })
-
   const hasQuickUnlock = typeof window !== 'undefined' && !!sessionStorage.getItem('vl2_qpwd')
 
   return (
@@ -287,7 +277,6 @@ function UnlockScreen({ onUnlock, onReset, onNewVault }) {
         {mode === 'tap' ? (
           <>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              {/* Tappable lock icon */}
               <div
                 onClick={handleLockTap}
                 style={{
@@ -296,62 +285,28 @@ function UnlockScreen({ onUnlock, onReset, onNewVault }) {
                   display: 'inline-block', padding: 16,
                   borderRadius: '50%',
                   background: tapHint === '✓' ? 'rgba(68,255,136,0.15)' :
-                              tapHint === '✗' ? 'rgba(255,68,68,0.15)' :
-                              tapState.tapsInGroup > 0 ? 'rgba(212,255,0,0.1)' : 'transparent',
+                              tapHint === '✗' ? 'rgba(255,68,68,0.15)' : 'transparent',
                   border: `2px solid ${
                     tapHint === '✓' ? 'rgba(68,255,136,0.4)' :
-                    tapHint === '✗' ? 'rgba(255,68,68,0.4)' :
-                    tapState.tapsInGroup > 0 ? 'rgba(212,255,0,0.3)' : 'transparent'
+                    tapHint === '✗' ? 'rgba(255,68,68,0.4)' : 'transparent'
                   }`,
                   transition: 'all 0.15s',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                {tapHint === '✓' ? '🔓' : tapHint === '✗' ? '🔒' : '🔒'}
+                {tapHint === '✓' ? '🔓' : '🔒'}
               </div>
-
-              <h1 style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 26, marginBottom: 8 }}>VaultLock</h1>
-
-              {hasQuickUnlock ? (
-                <p style={{ color: 'var(--text2)', fontSize: 13 }}>Toca el candado con tu patrón</p>
-              ) : (
-                <p style={{ color: 'var(--text3)', fontSize: 12, lineHeight: 1.6 }}>
-                  Patrón táctil no configurado aún<br/>
-                  <span style={{ color: 'var(--text2)' }}>Desbloquea con master password primero</span>
-                </p>
-              )}
+              <h1 style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 26 }}>VaultLock</h1>
             </div>
-
-            {/* Dot display */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 28, minHeight: 20 }}>
-              {dotDisplay.map((d, i) => d.spacer ? (
-                <div key={i} style={{ width: 12 }} />
-              ) : (
-                <div key={i} style={{
-                  width: d.filled ? 12 : 8, height: d.filled ? 12 : 8,
-                  borderRadius: '50%',
-                  background: d.filled ? 'var(--accent)' : 'var(--bg4)',
-                  border: d.active && !d.filled ? '1px solid var(--text3)' : 'none',
-                  transition: 'all 0.15s',
-                  boxShadow: d.filled ? '0 0 8px rgba(212,255,0,0.5)' : 'none',
-                }} />
-              ))}
-            </div>
-
-            {tapHint === '✗' && (
-              <div style={{ textAlign: 'center', color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: 13, marginBottom: 16 }}>
-                Patrón incorrecto
-              </div>
-            )}
 
             {error && <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', textAlign: 'center', marginBottom: 12 }}>{error}</div>}
 
             <button onClick={() => { setError(''); setMode('password') }} style={{
               background: 'none', border: '1px solid var(--border)', borderRadius: 8,
-              color: 'var(--text2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
+              color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
               padding: '10px', width: '100%', marginBottom: 8,
             }}>
-              Usar master password
+              ···
             </button>
           </>
         ) : (
